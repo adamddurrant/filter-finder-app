@@ -59,6 +59,39 @@ function App() {
       const filterResults = [];
       let processedFiles = 0;
       
+      // Core WordPress filter parameters
+      const coreFilterParams = {
+        'admin_body_class': ['$classes'],
+        'pre_get_posts': ['$query'],
+        'the_content': ['$content'],
+        'the_title': ['$title', '$id'],
+        'wp_title': ['$title', '$sep', '$seplocation'],
+        'body_class': ['$classes'],
+        'post_class': ['$classes', '$class', '$post_id'],
+        'excerpt_length': ['$length'],
+        'excerpt_more': ['$more_string'],
+        'wp_trim_excerpt': ['$text', '$raw_excerpt'],
+        'wp_mail': ['$args'],
+        'wp_mail_from': ['$email'],
+        'wp_mail_from_name': ['$name'],
+        'wp_mail_content_type': ['$content_type'],
+        'wp_mail_charset': ['$charset'],
+        'wp_redirect': ['$location', '$status'],
+        'wp_redirect_status': ['$status'],
+        'wp_die_handler': ['$handler'],
+        'wp_die_ajax_handler': ['$handler'],
+        'wp_die_json_handler': ['$handler'],
+        'wp_die_jsonp_handler': ['$handler'],
+        'wp_die_xmlrpc_handler': ['$handler'],
+        'wp_die_xml_handler': ['$handler'],
+        'wp_die_handler_override': ['$handler'],
+        'wp_die_ajax_handler_override': ['$handler'],
+        'wp_die_json_handler_override': ['$handler'],
+        'wp_die_jsonp_handler_override': ['$handler'],
+        'wp_die_xmlrpc_handler_override': ['$handler'],
+        'wp_die_xml_handler_override': ['$handler']
+      };
+
       // Process each file in the zip
       for (const [relativePath, zipEntry] of Object.entries(content.files)) {
         // Check if file is PHP or might contain PHP code
@@ -124,10 +157,8 @@ function App() {
                   const lines = fileContent.substring(0, match.index).split('\n');
                   const lineNumber = lines.length;
                   
-                  // Try to get the number of parameters from the add_filter call
-                  const acceptedArgsMatch = fullLine.match(/,\s*(\d+)\s*\)/);
-                  const numParams = acceptedArgsMatch ? parseInt(acceptedArgsMatch[1]) : 1;
-                  const defaultParams = Array(numParams).fill(0).map((_, i) => `$param${i + 1}`);
+                  // Use core filter parameters if available, otherwise use default
+                  const defaultParams = coreFilterParams[filterName] || ['$value'];
                   
                   filterResults.push({
                     filterName,
@@ -229,10 +260,11 @@ function App() {
           {filteredFilters.map((filter, index) => (
             <div key={index} className="filter-card">
               <h3>Filter: {filter.filterName}</h3>
-              <p>Function: {filter.functionName}</p>
-              <p>File: {filter.file} (Line {filter.lineNumber})</p>
+              <p><strong>Function:</strong> {filter.functionName}</p>
+              <p><strong>File:</strong> /{filter.file}</p>
+              <p><strong>Line num:</strong> {filter.lineNumber}</p>
               <div className="code-block">
-                <h4>Add Filter Boilerplate:</h4>
+                <h4>Filter Definition:</h4>
                 <div className="code-container">
                   <button 
                     className="copy-button"
@@ -249,10 +281,10 @@ function App() {
                   </SyntaxHighlighter>
                 </div>
               </div>
-              {filter.context !== 'Function definition not found' && (
+              {filter.context !== 'Function definition not found' ? (
                 <>
                   <div className="code-block">
-                    <h4>Filter Definition:</h4>
+                    <h4>Function Context:</h4>
                     <div className="code-container">
                       <button 
                         className="copy-button"
@@ -271,33 +303,33 @@ ${filter.context}
                       </SyntaxHighlighter>
                     </div>
                   </div>
-                  <div className="usage">
-                    <h4>Usage Example:</h4>
-                    <div className="code-container">
-                      <button 
-                        className="copy-button"
-                        onClick={() => copyToClipboard(
-                          filter.paramNames.length > 0 
-                            ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
-                            : `apply_filters('${filter.filterName}')`,
-                          `usage-${index}`
-                        )}
-                        title="Copy to clipboard"
-                      >
-                        <svg className="copy-icon" viewBox="0 0 24 24">
-                          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                        </svg>
-                        {copiedIndex === `usage-${index}` && <span className="copy-tooltip">Copied!</span>}
-                      </button>
-                      <SyntaxHighlighter language="php" style={tomorrow}>
-                        {filter.paramNames.length > 0 
-                          ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
-                          : `apply_filters('${filter.filterName}')`}
-                      </SyntaxHighlighter>
-                    </div>
-                  </div>
                 </>
-              )}
+              ) : null}
+              <div className="usage">
+                <h4>Usage Boilerplate:</h4>
+                <div className="code-container">
+                  <button 
+                    className="copy-button"
+                    onClick={() => copyToClipboard(
+                      filter.paramNames.length > 0 
+                        ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
+                        : `apply_filters('${filter.filterName}')`,
+                      `usage-${index}`
+                    )}
+                    title="Copy to clipboard"
+                  >
+                    <svg className="copy-icon" viewBox="0 0 24 24">
+                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                    {copiedIndex === `usage-${index}` && <span className="copy-tooltip">Copied!</span>}
+                  </button>
+                  <SyntaxHighlighter language="php" style={tomorrow}>
+                    {filter.paramNames.length > 0 
+                      ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
+                      : `apply_filters('${filter.filterName}')`}
+                  </SyntaxHighlighter>
+                </div>
+              </div>
             </div>
           ))}
         </div>
