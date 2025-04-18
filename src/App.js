@@ -10,6 +10,40 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [copiedIndex, setCopiedIndex] = useState(null);
+
+  const copyToClipboard = (text, index) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 1000);
+    });
+  };
+
+  const extractParams = (paramsString) => {
+    // Split by commas that are not inside brackets or quotes
+    const params = paramsString.split(/(?![^(]*\)),/).map(param => {
+      // Remove type hints, default values, and array syntax
+      return param
+        .trim()
+        .replace(/^\w+\s+\$/, '$') // Remove type hints
+        .replace(/\s*=\s*.*$/, '') // Remove default values
+        .replace(/\[\s*\]/g, '') // Remove empty array brackets
+        .replace(/array\s*\([^)]*\)/g, '$array') // Replace array() with $array
+        .replace(/\[[^\]]*\]/g, '$array'); // Replace [] with $array
+    }).filter(Boolean);
+    
+    return params;
+  };
+
+  const cleanFilterCall = (filterCall) => {
+    // Remove backslash and trim
+    return filterCall.replace(/^\\/, '').trim();
+  };
+
+  const cleanFunctionContext = (context) => {
+    // Remove all backslashes before function calls
+    return context.replace(/\\/g, '');
+  };
 
   const onDrop = useCallback(async (acceptedFiles) => {
     setLoading(true);
@@ -71,12 +105,16 @@ function App() {
                     const lines = fileContent.substring(0, match.index).split('\n');
                     const lineNumber = lines.length;
                     
+                    // Extract parameter names for usage example
+                    const paramNames = extractParams(params);
+                    
                     filterResults.push({
                       filterName,
                       functionName,
                       params,
-                      context: body,
-                      addFilterCode: fullLine,
+                      paramNames,
+                      context: cleanFunctionContext(body),
+                      addFilterCode: cleanFilterCall(fullLine),
                       file: relativePath,
                       lineNumber
                     });
@@ -86,12 +124,18 @@ function App() {
                   const lines = fileContent.substring(0, match.index).split('\n');
                   const lineNumber = lines.length;
                   
+                  // Try to get the number of parameters from the add_filter call
+                  const acceptedArgsMatch = fullLine.match(/,\s*(\d+)\s*\)/);
+                  const numParams = acceptedArgsMatch ? parseInt(acceptedArgsMatch[1]) : 1;
+                  const defaultParams = Array(numParams).fill(0).map((_, i) => `$param${i + 1}`);
+                  
                   filterResults.push({
                     filterName,
                     functionName,
                     params: 'unknown',
+                    paramNames: defaultParams,
                     context: 'Function definition not found',
-                    addFilterCode: fullLine,
+                    addFilterCode: cleanFilterCall(fullLine),
                     file: relativePath,
                     lineNumber
                   });
@@ -136,7 +180,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <h1>WordPress Filter Finder</h1>
-        <p>Drag and drop a WordPress plugin zip file to analyze its filters</p>
+        <p>Drag and drop a WordPress plugin zip file to fetch all filter hooks</p>
       </header>
 
       <div className="dropzone-container">
@@ -156,14 +200,28 @@ function App() {
 
       {filters.length > 0 && (
         <div className="results">
+          <div className="results-found">
+            {filters.length} filters found!
+          </div>
           <div className="search-container">
-            <input
-              type="text"
-              placeholder="Search filters..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
+            <div className="search-input-wrapper">
+              <input
+                type="text"
+                placeholder="Search filters..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+              {searchTerm && (
+                <button 
+                  className="clear-button"
+                  onClick={() => setSearchTerm('')}
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
             <div className="filter-count">
               Showing {filteredFilters.length} of {filters.length} filters
             </div>
@@ -174,26 +232,69 @@ function App() {
               <p>Function: {filter.functionName}</p>
               <p>File: {filter.file} (Line {filter.lineNumber})</p>
               <div className="code-block">
-                <h4>Add Filter Call:</h4>
-                <SyntaxHighlighter language="php" style={tomorrow}>
-                  {filter.addFilterCode}
-                </SyntaxHighlighter>
+                <h4>Add Filter Boilerplate:</h4>
+                <div className="code-container">
+                  <button 
+                    className="copy-button"
+                    onClick={() => copyToClipboard(filter.addFilterCode, `add-${index}`)}
+                    title="Copy to clipboard"
+                  >
+                    <svg className="copy-icon" viewBox="0 0 24 24">
+                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                    {copiedIndex === `add-${index}` && <span className="copy-tooltip">Copied!</span>}
+                  </button>
+                  <SyntaxHighlighter language="php" style={tomorrow}>
+                    {filter.addFilterCode}
+                  </SyntaxHighlighter>
+                </div>
               </div>
               {filter.context !== 'Function definition not found' && (
                 <>
                   <div className="code-block">
-                    <h4>Function Definition:</h4>
-                    <SyntaxHighlighter language="php" style={tomorrow}>
-                      {`function ${filter.functionName}(${filter.params}) {
+                    <h4>Filter Definition:</h4>
+                    <div className="code-container">
+                      <button 
+                        className="copy-button"
+                        onClick={() => copyToClipboard(`function ${filter.functionName}(${filter.params}) {\n${filter.context}\n}`, `def-${index}`)}
+                        title="Copy to clipboard"
+                      >
+                        <svg className="copy-icon" viewBox="0 0 24 24">
+                          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                        {copiedIndex === `def-${index}` && <span className="copy-tooltip">Copied!</span>}
+                      </button>
+                      <SyntaxHighlighter language="php" style={tomorrow}>
+                        {`function ${filter.functionName}(${filter.params}) {
 ${filter.context}
 }`}
-                    </SyntaxHighlighter>
+                      </SyntaxHighlighter>
+                    </div>
                   </div>
                   <div className="usage">
                     <h4>Usage Example:</h4>
-                    <SyntaxHighlighter language="php" style={tomorrow}>
-                      {`apply_filters('${filter.filterName}', ${filter.params.split(',')[0]})`}
-                    </SyntaxHighlighter>
+                    <div className="code-container">
+                      <button 
+                        className="copy-button"
+                        onClick={() => copyToClipboard(
+                          filter.paramNames.length > 0 
+                            ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
+                            : `apply_filters('${filter.filterName}')`,
+                          `usage-${index}`
+                        )}
+                        title="Copy to clipboard"
+                      >
+                        <svg className="copy-icon" viewBox="0 0 24 24">
+                          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                        {copiedIndex === `usage-${index}` && <span className="copy-tooltip">Copied!</span>}
+                      </button>
+                      <SyntaxHighlighter language="php" style={tomorrow}>
+                        {filter.paramNames.length > 0 
+                          ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
+                          : `apply_filters('${filter.filterName}')`}
+                      </SyntaxHighlighter>
+                    </div>
                   </div>
                 </>
               )}
