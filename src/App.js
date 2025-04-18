@@ -1,9 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import JSZip from 'jszip';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './App.css';
+
+// Maximum file size (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// Allowed file extensions in the zip
+const ALLOWED_EXTENSIONS = ['.php', '.inc', '.txt', '.md'];
+
+// Potentially dangerous file extensions
+const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.sh', '.htm', '.phtml'];
 
 function App() {
   const [filters, setFilters] = useState([]);
@@ -11,6 +20,16 @@ function App() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // Debounce the search term
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -19,30 +38,70 @@ function App() {
     });
   };
 
-  const extractParams = (paramsString) => {
-    // Split by commas that are not inside brackets or quotes
-    const params = paramsString.split(/(?![^(]*\)),/).map(param => {
-      // Remove type hints, default values, and array syntax
-      return param
-        .trim()
-        .replace(/^\w+\s+\$/, '$') // Remove type hints
-        .replace(/\s*=\s*.*$/, '') // Remove default values
-        .replace(/\[\s*\]/g, '') // Remove empty array brackets
-        .replace(/array\s*\([^)]*\)/g, '$array') // Replace array() with $array
-        .replace(/\[[^\]]*\]/g, '$array'); // Replace [] with $array
-    }).filter(Boolean);
+  const sanitizeCode = (code) => {
+    return code
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<\?php\s*eval\s*\(/gi, '<?php /* eval removed */ (')
+      .replace(/<\?php\s*base64_decode\s*\(/gi, '<?php /* base64_decode removed */ (')
+      .replace(/<\?php\s*system\s*\(/gi, '<?php /* system removed */ (')
+      .replace(/<\?php\s*exec\s*\(/gi, '<?php /* exec removed */ (')
+      .replace(/<\?php\s*shell_exec\s*\(/gi, '<?php /* shell_exec removed */ (');
+  };
+
+  const validateZipContents = (zip) => {
+    const files = Object.keys(zip.files);
     
-    return params;
+    const dangerousFiles = files.filter(file => 
+      DANGEROUS_EXTENSIONS.some(ext => file.toLowerCase().endsWith(ext))
+    );
+    
+    if (dangerousFiles.length > 0) {
+      throw new Error(`Potentially dangerous files found: ${dangerousFiles.join(', ')}`);
+    }
+
+    const phpFiles = files.filter(file => 
+      file.toLowerCase().endsWith('.php')
+    );
+    
+    if (phpFiles.length === 0) {
+      throw new Error('No PHP files found in the zip. This does not appear to be a WordPress plugin.');
+    }
   };
 
-  const cleanFilterCall = (filterCall) => {
-    // Remove backslash and trim
-    return filterCall.replace(/^\\/, '').trim();
-  };
+  const findContainingFunction = (content, applyFiltersIndex) => {
+    // Find the start of the function
+    let functionStart = content.lastIndexOf('function', applyFiltersIndex);
+    if (functionStart === -1) return null;
 
-  const cleanFunctionContext = (context) => {
-    // Remove all backslashes before function calls
-    return context.replace(/\\/g, '');
+    // Find the function name
+    const functionNameMatch = content.substring(functionStart).match(/function\s+(\w+)\s*\(/);
+    if (!functionNameMatch) return null;
+    const functionName = functionNameMatch[1];
+
+    // Find the end of the function
+    let bracketCount = 0;
+    let functionEnd = functionStart;
+    let inFunction = false;
+
+    while (functionEnd < content.length) {
+      if (content[functionEnd] === '{') {
+        bracketCount++;
+        inFunction = true;
+      } else if (content[functionEnd] === '}') {
+        bracketCount--;
+        if (inFunction && bracketCount === 0) {
+          break;
+        }
+      }
+      functionEnd++;
+    }
+
+    if (functionEnd >= content.length) return null;
+
+    return {
+      name: functionName,
+      content: content.substring(functionStart, functionEnd + 1)
+    };
   };
 
   const onDrop = useCallback(async (acceptedFiles) => {
@@ -53,124 +112,53 @@ function App() {
 
     try {
       const file = acceptedFiles[0];
+      
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error(`File is too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+      }
+
       const zip = new JSZip();
       const content = await zip.loadAsync(file);
+      
+      validateZipContents(content);
       
       const filterResults = [];
       let processedFiles = 0;
       
-      // Core WordPress filter parameters
-      const coreFilterParams = {
-        'admin_body_class': ['$classes'],
-        'pre_get_posts': ['$query'],
-        'the_content': ['$content'],
-        'the_title': ['$title', '$id'],
-        'wp_title': ['$title', '$sep', '$seplocation'],
-        'body_class': ['$classes'],
-        'post_class': ['$classes', '$class', '$post_id'],
-        'excerpt_length': ['$length'],
-        'excerpt_more': ['$more_string'],
-        'wp_trim_excerpt': ['$text', '$raw_excerpt'],
-        'wp_mail': ['$args'],
-        'wp_mail_from': ['$email'],
-        'wp_mail_from_name': ['$name'],
-        'wp_mail_content_type': ['$content_type'],
-        'wp_mail_charset': ['$charset'],
-        'wp_redirect': ['$location', '$status'],
-        'wp_redirect_status': ['$status'],
-        'wp_die_handler': ['$handler'],
-        'wp_die_ajax_handler': ['$handler'],
-        'wp_die_json_handler': ['$handler'],
-        'wp_die_jsonp_handler': ['$handler'],
-        'wp_die_xmlrpc_handler': ['$handler'],
-        'wp_die_xml_handler': ['$handler'],
-        'wp_die_handler_override': ['$handler'],
-        'wp_die_ajax_handler_override': ['$handler'],
-        'wp_die_json_handler_override': ['$handler'],
-        'wp_die_jsonp_handler_override': ['$handler'],
-        'wp_die_xmlrpc_handler_override': ['$handler'],
-        'wp_die_xml_handler_override': ['$handler']
-      };
-
-      // Process each file in the zip
       for (const [relativePath, zipEntry] of Object.entries(content.files)) {
-        // Check if file is PHP or might contain PHP code
         if (relativePath.endsWith('.php') || 
             relativePath.endsWith('.inc') || 
             relativePath.includes('.php') || 
             !relativePath.includes('.')) {
           try {
             const fileContent = await zipEntry.async('text');
+            const sanitizedContent = sanitizeCode(fileContent);
             processedFiles++;
             
-            // Find add_filter calls - very simple pattern
-            const filterRegex = /add_filter/g;
+            // Find apply_filters calls
+            const applyFiltersRegex = /apply_filters\s*\(\s*['"]([^'"]+)['"]\s*,[^)]*\)/g;
             let match;
             
-            while ((match = filterRegex.exec(fileContent)) !== null) {
-              // Get the full line containing the add_filter call
-              const lineStart = fileContent.lastIndexOf('\n', match.index) + 1;
-              const lineEnd = fileContent.indexOf('\n', match.index);
-              const fullLine = fileContent.substring(lineStart, lineEnd).trim();
+            while ((match = applyFiltersRegex.exec(sanitizedContent)) !== null) {
+              const filterName = match[1];
+              const applyFiltersCall = match[0];
               
-              // Try to extract filter name and function name
-              const filterNameMatch = fullLine.match(/['"]([^'"]+)['"]/);
-              const functionNameMatch = fullLine.match(/,\s*['"]([^'"]+)['"]/);
+              // Find the containing function
+              const containingFunction = findContainingFunction(sanitizedContent, match.index);
               
-              if (filterNameMatch && functionNameMatch) {
-                const filterName = filterNameMatch[1];
-                const functionName = functionNameMatch[1];
+              if (containingFunction) {
+                // Get the line number
+                const lines = sanitizedContent.substring(0, match.index).split('\n');
+                const lineNumber = lines.length;
                 
-                // Find the function definition with a more flexible pattern
-                const functionRegex = new RegExp(`function\\s+${functionName}\\s*\\([^)]*\\)\\s*\\{[^}]*\\}`, 's');
-                const functionMatch = functionRegex.exec(fileContent);
-                
-                if (functionMatch) {
-                  const functionDef = functionMatch[0];
-                  const paramsMatch = functionDef.match(/function\s+\w+\s*\(([^)]*)\)/);
-                  const bodyMatch = functionDef.match(/\{([^}]*)\}/s);
-                  
-                  if (paramsMatch && bodyMatch) {
-                    const params = paramsMatch[1].trim();
-                    const body = bodyMatch[1].trim();
-                    
-                    // Get the line number
-                    const lines = fileContent.substring(0, match.index).split('\n');
-                    const lineNumber = lines.length;
-                    
-                    // Extract parameter names for usage example
-                    const paramNames = extractParams(params);
-                    
-                    filterResults.push({
-                      filterName,
-                      functionName,
-                      params,
-                      paramNames,
-                      context: cleanFunctionContext(body),
-                      addFilterCode: cleanFilterCall(fullLine),
-                      file: relativePath,
-                      lineNumber
-                    });
-                  }
-                } else {
-                  // If we can't find the function definition, still include the filter
-                  const lines = fileContent.substring(0, match.index).split('\n');
-                  const lineNumber = lines.length;
-                  
-                  // Use core filter parameters if available, otherwise use default
-                  const defaultParams = coreFilterParams[filterName] || ['$value'];
-                  
-                  filterResults.push({
-                    filterName,
-                    functionName,
-                    params: 'unknown',
-                    paramNames: defaultParams,
-                    context: 'Function definition not found',
-                    addFilterCode: cleanFilterCall(fullLine),
-                    file: relativePath,
-                    lineNumber
-                  });
-                }
+                filterResults.push({
+                  filterName,
+                  functionName: containingFunction.name,
+                  applyFiltersCall,
+                  functionContext: containingFunction.content,
+                  file: relativePath,
+                  lineNumber
+                });
               }
             }
           } catch (err) {
@@ -193,25 +181,38 @@ function App() {
     accept: {
       'application/zip': ['.zip']
     },
-    multiple: false
+    multiple: false,
+    maxSize: MAX_FILE_SIZE
   });
 
-  const filteredFilters = filters.filter(filter => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      filter.filterName.toLowerCase().includes(searchLower) ||
-      filter.functionName.toLowerCase().includes(searchLower) ||
-      filter.file.toLowerCase().includes(searchLower) ||
-      filter.addFilterCode.toLowerCase().includes(searchLower)
+  // Pre-process the filters for faster searching
+  const processedFilters = useMemo(() => {
+    return filters.map(filter => ({
+      ...filter,
+      searchableText: `${filter.filterName} ${filter.functionName} ${filter.file}`.toLowerCase()
+    }));
+  }, [filters]);
+
+  // Optimized search function
+  const searchFilters = useCallback((term) => {
+    if (!term) return processedFilters;
+    
+    const searchTerm = term.toLowerCase();
+    return processedFilters.filter(filter => 
+      filter.searchableText.includes(searchTerm)
     );
-  });
+  }, [processedFilters]);
+
+  // Memoized search results
+  const filteredFilters = useMemo(() => {
+    return searchFilters(debouncedSearchTerm);
+  }, [searchFilters, debouncedSearchTerm]);
 
   return (
     <div className="App">
       <header className="App-header">
         <h1>WordPress Filter Finder</h1>
-        <p>Drag and drop a WordPress plugin zip file to fetch all filter hooks</p>
+        <p>Drag and drop a WordPress plugin zip file to find all available filters</p>
       </header>
 
       <div className="dropzone-container">
@@ -222,6 +223,7 @@ function App() {
           ) : (
             <p>Drag 'n' drop a WordPress plugin zip file here, or click to select</p>
           )}
+          <p className="file-size-limit">Maximum file size: {MAX_FILE_SIZE / 1024 / 1024}MB</p>
         </div>
       </div>
 
@@ -264,69 +266,38 @@ function App() {
               <p><strong>File:</strong> /{filter.file}</p>
               <p><strong>Line num:</strong> {filter.lineNumber}</p>
               <div className="code-block">
-                <h4>Filter Definition:</h4>
+                <h4>Function Context:</h4>
                 <div className="code-container">
                   <button 
                     className="copy-button"
-                    onClick={() => copyToClipboard(filter.addFilterCode, `add-${index}`)}
+                    onClick={() => copyToClipboard(filter.functionContext, `func-${index}`)}
                     title="Copy to clipboard"
                   >
                     <svg className="copy-icon" viewBox="0 0 24 24">
                       <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                     </svg>
-                    {copiedIndex === `add-${index}` && <span className="copy-tooltip">Copied!</span>}
+                    {copiedIndex === `func-${index}` && <span className="copy-tooltip">Copied!</span>}
                   </button>
                   <SyntaxHighlighter language="php" style={tomorrow}>
-                    {filter.addFilterCode}
+                    {filter.functionContext}
                   </SyntaxHighlighter>
                 </div>
               </div>
-              {filter.context !== 'Function definition not found' ? (
-                <>
-                  <div className="code-block">
-                    <h4>Function Context:</h4>
-                    <div className="code-container">
-                      <button 
-                        className="copy-button"
-                        onClick={() => copyToClipboard(`function ${filter.functionName}(${filter.params}) {\n${filter.context}\n}`, `def-${index}`)}
-                        title="Copy to clipboard"
-                      >
-                        <svg className="copy-icon" viewBox="0 0 24 24">
-                          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                        </svg>
-                        {copiedIndex === `def-${index}` && <span className="copy-tooltip">Copied!</span>}
-                      </button>
-                      <SyntaxHighlighter language="php" style={tomorrow}>
-                        {`function ${filter.functionName}(${filter.params}) {
-${filter.context}
-}`}
-                      </SyntaxHighlighter>
-                    </div>
-                  </div>
-                </>
-              ) : null}
               <div className="usage">
-                <h4>Usage Boilerplate:</h4>
+                <h4>Filter Applied:</h4>
                 <div className="code-container">
                   <button 
                     className="copy-button"
-                    onClick={() => copyToClipboard(
-                      filter.paramNames.length > 0 
-                        ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
-                        : `apply_filters('${filter.filterName}')`,
-                      `usage-${index}`
-                    )}
+                    onClick={() => copyToClipboard(filter.applyFiltersCall, `apply-${index}`)}
                     title="Copy to clipboard"
                   >
                     <svg className="copy-icon" viewBox="0 0 24 24">
                       <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                     </svg>
-                    {copiedIndex === `usage-${index}` && <span className="copy-tooltip">Copied!</span>}
+                    {copiedIndex === `apply-${index}` && <span className="copy-tooltip">Copied!</span>}
                   </button>
                   <SyntaxHighlighter language="php" style={tomorrow}>
-                    {filter.paramNames.length > 0 
-                      ? `apply_filters('${filter.filterName}', ${filter.paramNames.join(', ')})`
-                      : `apply_filters('${filter.filterName}')`}
+                    {filter.applyFiltersCall}
                   </SyntaxHighlighter>
                 </div>
               </div>
