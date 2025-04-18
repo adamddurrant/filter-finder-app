@@ -3,6 +3,8 @@ import { useDropzone } from 'react-dropzone';
 import JSZip from 'jszip';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import wpFilters from './wp-filters.json';
+
 import './App.css';
 
 // Maximum file size (10MB)
@@ -21,12 +23,14 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const knownHooks = new Set(wpFilters.map(entry => entry.Hook).filter(Boolean));
+
 
   // Debounce the search term
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 300); // 300ms delay
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -50,19 +54,19 @@ function App() {
 
   const validateZipContents = (zip) => {
     const files = Object.keys(zip.files);
-    
-    const dangerousFiles = files.filter(file => 
+
+    const dangerousFiles = files.filter(file =>
       DANGEROUS_EXTENSIONS.some(ext => file.toLowerCase().endsWith(ext))
     );
-    
+
     if (dangerousFiles.length > 0) {
       throw new Error(`Potentially dangerous files found: ${dangerousFiles.join(', ')}`);
     }
 
-    const phpFiles = files.filter(file => 
+    const phpFiles = files.filter(file =>
       file.toLowerCase().endsWith('.php')
     );
-    
+
     if (phpFiles.length === 0) {
       throw new Error('No PHP files found in the zip. This does not appear to be a WordPress plugin.');
     }
@@ -112,53 +116,56 @@ function App() {
 
     try {
       const file = acceptedFiles[0];
-      
+
       if (file.size > MAX_FILE_SIZE) {
         throw new Error(`File is too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`);
       }
 
       const zip = new JSZip();
       const content = await zip.loadAsync(file);
-      
+
       validateZipContents(content);
-      
+
       const filterResults = [];
       let processedFiles = 0;
-      
+
       for (const [relativePath, zipEntry] of Object.entries(content.files)) {
-        if (relativePath.endsWith('.php') || 
-            relativePath.endsWith('.inc') || 
-            relativePath.includes('.php') || 
-            !relativePath.includes('.')) {
+        if (relativePath.endsWith('.php') ||
+          relativePath.endsWith('.inc') ||
+          relativePath.includes('.php') ||
+          !relativePath.includes('.')) {
           try {
             const fileContent = await zipEntry.async('text');
             const sanitizedContent = sanitizeCode(fileContent);
             processedFiles++;
-            
+
             // Find apply_filters calls
             const applyFiltersRegex = /apply_filters\s*\(\s*['"]([^'"]+)['"]\s*,[^)]*\)/g;
             let match;
-            
+
             while ((match = applyFiltersRegex.exec(sanitizedContent)) !== null) {
               const filterName = match[1];
               const applyFiltersCall = match[0];
-              
+
               // Find the containing function
               const containingFunction = findContainingFunction(sanitizedContent, match.index);
-              
+
               if (containingFunction) {
                 // Get the line number
                 const lines = sanitizedContent.substring(0, match.index).split('\n');
                 const lineNumber = lines.length;
-                
-                filterResults.push({
-                  filterName,
-                  functionName: containingFunction.name,
-                  applyFiltersCall,
-                  functionContext: containingFunction.content,
-                  file: relativePath,
-                  lineNumber
-                });
+
+                if (!knownHooks.has(filterName)) {
+                  filterResults.push({
+                    filterName,
+                    functionName: containingFunction.name,
+                    applyFiltersCall,
+                    functionContext: containingFunction.content,
+                    file: relativePath,
+                    lineNumber
+                  });
+                }
+
               }
             }
           } catch (err) {
@@ -166,7 +173,7 @@ function App() {
           }
         }
       }
-      
+
       console.log(`Processed ${processedFiles} files, found ${filterResults.length} filters`);
       setFilters(filterResults);
     } catch (err) {
@@ -196,9 +203,9 @@ function App() {
   // Optimized search function
   const searchFilters = useCallback((term) => {
     if (!term) return processedFilters;
-    
+
     const searchTerm = term.toLowerCase();
-    return processedFilters.filter(filter => 
+    return processedFilters.filter(filter =>
       filter.searchableText.includes(searchTerm)
     );
   }, [processedFilters]);
@@ -228,7 +235,7 @@ function App() {
       </div>
 
       {loading && <div className="loading">Processing...</div>}
-      
+
       {error && <div className="error">{error}</div>}
 
       {filters.length > 0 && (
@@ -246,7 +253,7 @@ function App() {
                 className="search-input"
               />
               {searchTerm && (
-                <button 
+                <button
                   className="clear-button"
                   onClick={() => setSearchTerm('')}
                   title="Clear search"
@@ -268,13 +275,13 @@ function App() {
               <div className="code-block">
                 <h4>Function Context:</h4>
                 <div className="code-container">
-                  <button 
+                  <button
                     className="copy-button"
                     onClick={() => copyToClipboard(filter.functionContext, `func-${index}`)}
                     title="Copy to clipboard"
                   >
                     <svg className="copy-icon" viewBox="0 0 24 24">
-                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
                     </svg>
                     {copiedIndex === `func-${index}` && <span className="copy-tooltip">Copied!</span>}
                   </button>
@@ -286,13 +293,13 @@ function App() {
               <div className="usage">
                 <h4>Filter Applied:</h4>
                 <div className="code-container">
-                  <button 
+                  <button
                     className="copy-button"
                     onClick={() => copyToClipboard(filter.applyFiltersCall, `apply-${index}`)}
                     title="Copy to clipboard"
                   >
                     <svg className="copy-icon" viewBox="0 0 24 24">
-                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
                     </svg>
                     {copiedIndex === `apply-${index}` && <span className="copy-tooltip">Copied!</span>}
                   </button>
