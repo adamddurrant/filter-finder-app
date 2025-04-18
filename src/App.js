@@ -24,13 +24,14 @@ function App() {
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const knownHooks = new Set(wpFilters.map(entry => entry.Hook).filter(Boolean));
+  const [visibleCount, setVisibleCount] = useState(10); // Start by showing 10
 
 
   // Debounce the search term
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 1000);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -216,7 +217,7 @@ function App() {
   }, [searchFilters, debouncedSearchTerm]);
 
   return (
-    <div className="App">
+    <div id="app" className="App">
       <header className="App-header">
         <h1>WordPress Filter Finder</h1>
         <p>Drag and drop a WordPress plugin zip file to find all available filters</p>
@@ -266,7 +267,14 @@ function App() {
               Showing {filteredFilters.length} of {filters.length} filters
             </div>
           </div>
-          {filteredFilters.map((filter, index) => (
+
+          {filteredFilters.length === 0 && (
+            <div className="no-results">
+              No filters match your search :(
+            </div>
+          )}
+
+          {filteredFilters.slice(0, visibleCount).map((filter, index) => (
             <div key={index} className="filter-card">
               <h3>Filter: {filter.filterName}</h3>
               <p><strong>Function:</strong> {filter.functionName}</p>
@@ -311,8 +319,20 @@ function App() {
             </div>
           ))}
         </div>
+
+      )}
+      {visibleCount < filteredFilters.length && (
+        <div className="show-more-container">
+          <button className="show-more-button" onClick={() => setVisibleCount(prev => prev + 10)}>
+            Show more
+          </button>
+          <a href="#app" className="back-to-top">
+            Top
+          </a>
+        </div>
       )}
     </div>
+
   );
 }
 

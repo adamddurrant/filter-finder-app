@@ -45,6 +45,25 @@
   border-radius: 8px;
 }
 
+.show-more-container {
+  text-align: center;
+  margin: 1em 0;
+}
+
+.show-more-button {
+  background-color: #0073aa;
+  color: white;
+  padding: 0.5em 1em;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.show-more-button:hover {
+  background-color: #005177;
+}
+
 .App-header h1 {
   color: #e0e0e0;
   margin-bottom: 1rem;
