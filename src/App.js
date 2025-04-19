@@ -4,6 +4,8 @@ import JSZip from 'jszip';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import wpFilters from './wp-filters.json'
+import { Helmet } from 'react-helmet';
+
 import './App.css';
 
 // Maximum file size (15MB)
@@ -16,6 +18,7 @@ const ALLOWED_EXTENSIONS = ['.php', '.inc', '.txt', '.md'];
 const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.sh', '.htm', '.phtml'];
 
 function App() {
+
   const [filters, setFilters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -216,7 +219,26 @@ function App() {
   }, [searchFilters, debouncedSearchTerm]);
 
   return (
+
     <div id="app" className="App">
+
+      <Helmet>
+        <title>WordPress Filter Finder</title>
+        <meta name="description" content="Upload a WordPress plugin and detect custom apply_filters() calls. Easily find hooks not in core WordPress." />
+
+        {/* Favicons */}
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-small.png" />
+        <link rel="icon" type="image/png" sizes="96x96" href="/favicon-large.png" />
+        <link rel="apple-touch-icon" href="/favicon-large.png" />
+
+        {/* Open Graph Meta Tags */}
+        <meta property="og:title" content="WordPress Filter Finder" />
+        <meta property="og:description" content="Upload a WordPress plugin and detect custom apply_filters() calls. Easily find hooks not in core WordPress." />
+        <meta property="og:image" content="/favicon-large.png" />
+        <meta property="og:type" content="website" />
+      </Helmet>
+
+
       <header className="App-header">
         <h1>WordPress<span className="highlight"> Filter Finder</span></h1>
         <p>Drag and drop a WordPress plugin zip file to extract custom <code>apply_filters()</code> calls. Known Wordpress filters are excluded.</p>
