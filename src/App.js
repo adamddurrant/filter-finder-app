@@ -3,12 +3,11 @@ import { useDropzone } from 'react-dropzone';
 import JSZip from 'jszip';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import wpFilters from './wp-filters.json';
-
+import wpFilters from './wp-filters.json'
 import './App.css';
 
-// Maximum file size (10MB)
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Maximum file size (15MB)
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
 
 // Allowed file extensions in the zip
 const ALLOWED_EXTENSIONS = ['.php', '.inc', '.txt', '.md'];
@@ -219,8 +218,8 @@ function App() {
   return (
     <div id="app" className="App">
       <header className="App-header">
-        <h1>WordPress Filter Finder</h1>
-        <p>Drag and drop a WordPress plugin zip file to find all available filters</p>
+        <h1>WordPress Custom Filter Finder</h1>
+        <p>Drag and drop a WordPress plugin zip file to extract custom filters</p>
       </header>
 
       <div className="dropzone-container">
@@ -277,7 +276,7 @@ function App() {
           {filteredFilters.slice(0, visibleCount).map((filter, index) => (
             <div key={index} className="filter-card">
               <h3>Filter: {filter.filterName}</h3>
-              <p><strong>Function:</strong> {filter.functionName}</p>
+              <p><strong>Function:</strong> {filter.functionName}()</p>
               <p><strong>File:</strong> /{filter.file}</p>
               <p><strong>Line num:</strong> {filter.lineNumber}</p>
               <div className="code-block">
@@ -327,7 +326,7 @@ function App() {
             Show more
           </button>
           <a href="#app" className="back-to-top">
-            Top
+            <img src="/chevron-up.svg" alt="arrow-up" />
           </a>
         </div>
       )}

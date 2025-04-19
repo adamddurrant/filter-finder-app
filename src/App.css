@@ -1,3 +1,7 @@
+html {
+  scroll-behavior: smooth;
+}
+
 #root {
   background-color: #1a1a1a;
   min-height: 100vh;
@@ -19,7 +23,7 @@
 
 .results-found {
   text-align: center;
-  font-size: 2rem;
+  font-size: 1.5rem;
   margin-bottom: 2rem;
   font-weight: bold;
   color: #e0e0e0;
@@ -47,27 +51,53 @@
 
 .show-more-container {
   text-align: center;
-  margin: 1em 0;
+  margin: 2em 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.back-to-top {
+  position: absolute;
+  right: 0;
+}
+
+.back-to-top img {
+  width: 15px;
+  height: 15px;
+  filter: invert(1);
+  background-color: #c7c7c7;
+  border: 1px solid #c7c7c7;
+  border-radius: 100px;
+  transition: all 0.3s ease;
+  padding: 5px;
+}
+
+.back-to-top img:hover {
+  border-color: #ffa34a;
+} 
+
 .show-more-button {
-  background-color: #0073aa;
+  transition: all 0.3s ease;
+  background-color: #2d2d2d;
   color: white;
-  padding: 0.5em 1em;
+  padding: 0.8em 1.2em;
   font-size: 1rem;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid #2d2d2d;
+  border-radius: 100px;
   cursor: pointer;
 }
 
 .show-more-button:hover {
-  background-color: #005177;
+  border-color: #4a9eff;
 }
 
 .App-header h1 {
   color: #e0e0e0;
   margin-bottom: 1rem;
   margin-top: 0;
+  font-size: 2.5rem;
 }
 
 .App-header p {
@@ -84,6 +114,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -93,7 +124,7 @@
   margin: 2rem 0;
 }
 
-.dropzone-container:has( + .results) {
+.dropzone-container:has(+ .results) {
   display: none;
 }
 
@@ -235,18 +266,20 @@
   color: #a0a0a0;
 }
 
-.code-block, .usage {
+.code-block,
+.usage {
   padding-top: 1rem;
   border-radius: 4px;
 }
 
-.code-block pre, 
+.code-block pre,
 .usage pre {
-  background-color: #1a1a1a!important;
-  padding: 1em 2em 1em 1em!important;
+  background-color: #1a1a1a !important;
+  padding: 1em 2em 1em 1em !important;
 }
 
-.code-block h4, .usage h4 {
+.code-block h4,
+.usage h4 {
   color: #e0e0e0;
   margin-bottom: 0.5rem;
   margin-top: 10px;
@@ -366,10 +399,21 @@
 }
 
 @keyframes fadeInOut {
-  0% { opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 .file-size-limit {
