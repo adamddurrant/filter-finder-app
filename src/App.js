@@ -218,8 +218,8 @@ function App() {
   return (
     <div id="app" className="App">
       <header className="App-header">
-        <h1>WordPress Custom Filter Finder</h1>
-        <p>Drag and drop a WordPress plugin zip file to extract custom filters</p>
+        <h1>WordPress<span className="highlight"> Filter Finder</span></h1>
+        <p>Drag and drop a WordPress plugin zip file to extract custom <code>apply_filters()</code> calls. Known Wordpress filters are excluded.</p>
       </header>
 
       <div className="dropzone-container">

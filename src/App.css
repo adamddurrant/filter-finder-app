@@ -16,6 +16,12 @@ html {
   color: #e0e0e0;
 }
 
+@media (max-width: 600px) {
+  .App {
+    padding: 10px;
+  }
+}
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;
@@ -49,6 +55,28 @@ html {
   border-radius: 8px;
 }
 
+.highlight {
+  color: #4a9eff;
+}
+
+@media (max-width: 600px) {
+  .App-header {
+    padding: 1.5rem;
+  }
+}
+
+.App-header p {
+  max-width: 550px;
+  font-size: 18px;
+}
+
+.App-header code {
+  font-size: 15px;
+  background-color: #4f4f4f;
+  padding: 3px;
+  border-radius: 3px;
+}
+
 .show-more-container {
   text-align: center;
   margin: 2em 0;
@@ -76,7 +104,7 @@ html {
 
 .back-to-top img:hover {
   border-color: #ffa34a;
-} 
+}
 
 .show-more-button {
   transition: all 0.3s ease;
