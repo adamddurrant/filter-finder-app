@@ -8,8 +8,8 @@ import { Helmet } from 'react-helmet';
 
 import './App.css';
 
-// Maximum file size (15MB)
-const MAX_FILE_SIZE = 15 * 1024 * 1024;
+// Maximum file size (150MB)
+const MAX_FILE_SIZE = 150 * 1024 * 1024;
 
 // Allowed file extensions in the zip
 const ALLOWED_EXTENSIONS = ['.php', '.inc', '.txt', '.md'];
