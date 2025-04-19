@@ -15,7 +15,7 @@ const MAX_FILE_SIZE = 15 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['.php', '.inc', '.txt', '.md'];
 
 // Potentially dangerous file extensions
-const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.sh', '.htm', '.phtml'];
+const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.htm', '.phtml'];
 
 function App() {
 
