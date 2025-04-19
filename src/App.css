@@ -86,6 +86,12 @@ html {
   justify-content: center;
 }
 
+@media (max-width: 600px) {
+  .search-container {
+    flex-direction: column;
+  }
+}
+
 .back-to-top {
   position: absolute;
   right: 0;
@@ -106,6 +112,18 @@ html {
   border-color: #ffa34a;
 }
 
+.download-button {
+  transition: all 0.3s ease;
+  background-color: #1a1a1a;
+  color: white;
+  padding: 0.5em 1em;
+  font-size: 1rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 100px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .show-more-button {
   transition: all 0.3s ease;
   background-color: #2d2d2d;
@@ -117,7 +135,8 @@ html {
   cursor: pointer;
 }
 
-.show-more-button:hover {
+.show-more-button:hover,
+.download-button:hover {
   border-color: #4a9eff;
 }
 
@@ -202,6 +221,7 @@ html {
 }
 
 .search-container {
+  gap: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -216,7 +236,6 @@ html {
   display: flex;
   align-items: center;
   width: 100%;
-  margin-right: 1rem;
 }
 
 .search-input {
@@ -263,7 +282,6 @@ html {
 }
 
 .filter-count {
-  margin-left: 1rem;
   color: #a0a0a0;
   font-size: 0.9rem;
   white-space: nowrap;

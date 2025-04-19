@@ -224,7 +224,7 @@ function App() {
 
       <Helmet>
         <title>WordPress Filter Finder</title>
-        <meta name="description" content="Upload a WordPress plugin and detect custom apply_filters() calls. Easily find hooks not in core WordPress." />
+        <meta name="description" content="Upload a WordPress plugin or theme and detect custom apply_filters() calls. Easily find hooks not in core WordPress." />
 
         {/* Favicons */}
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-small.png" />
@@ -241,7 +241,7 @@ function App() {
 
       <header className="App-header">
         <h1>WordPress<span className="highlight"> Filter Finder</span></h1>
-        <p>Drag and drop a WordPress plugin zip file to extract custom <code>apply_filters()</code> calls. Known Wordpress filters are excluded.</p>
+        <p>Drag and drop a WordPress plugin/theme zip file to extract custom <code>apply_filters()</code> calls. Known Wordpress filters are excluded.</p>
       </header>
 
       <div className="dropzone-container">
@@ -263,7 +263,7 @@ function App() {
       {filters.length > 0 && (
         <div className="results">
           <div className="results-found">
-            {filters.length} filters found!
+            {filters.length} total filters found!
           </div>
           <div className="search-container">
             <div className="search-input-wrapper">
@@ -286,6 +286,22 @@ function App() {
             </div>
             <div className="filter-count">
               Showing {filteredFilters.length} of {filters.length} filters
+            </div>
+            <div className="download-json">
+              <button
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(filteredFilters, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'custom-wp-filters.json';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="download-button"
+              >
+                Download as JSON
+              </button>
             </div>
           </div>
 
