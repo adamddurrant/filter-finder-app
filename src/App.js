@@ -254,7 +254,7 @@ ${filter.applyFiltersCall}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'custom-wp-filters.md';
+    a.download = 'custom-filters.md';
     a.click();
     URL.revokeObjectURL(url);
     setShowDownloadSelector(false);
@@ -265,7 +265,7 @@ ${filter.applyFiltersCall}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'custom-wp-filters.json';
+    a.download = 'custom-filters.json';
     a.click();
     URL.revokeObjectURL(url);
     setShowDownloadSelector(false);
