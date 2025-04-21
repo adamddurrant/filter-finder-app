@@ -11,9 +11,6 @@ import './App.css';
 // Maximum file size (150MB)
 const MAX_FILE_SIZE = 150 * 1024 * 1024;
 
-// Allowed file extensions in the zip
-const ALLOWED_EXTENSIONS = ['.php', '.inc', '.txt', '.md'];
-
 // Potentially dangerous file extensions
 const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.htm', '.phtml'];
 
@@ -27,7 +24,22 @@ function App() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const knownHooks = new Set(wpFilters.map(entry => entry.Hook).filter(Boolean));
   const [visibleCount, setVisibleCount] = useState(10); // Start by showing 10
+  const [showDownloadSelector, setShowDownloadSelector] = useState(false);
+  const downloadSelectorRef = React.useRef(null);
 
+  // Add click outside handler
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (downloadSelectorRef.current && !downloadSelectorRef.current.contains(event.target)) {
+        setShowDownloadSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Debounce the search term
   React.useEffect(() => {
@@ -218,6 +230,47 @@ function App() {
     return searchFilters(debouncedSearchTerm);
   }, [searchFilters, debouncedSearchTerm]);
 
+  const downloadAsMarkdown = () => {
+    const markdownContent = filteredFilters.map(filter => {
+      return `## Filter: ${filter.filterName}
+**Function:** ${filter.functionName}()
+**File:** /${filter.file}
+**Line num:** ${filter.lineNumber}
+
+### Function Context:
+\`\`\`php
+${filter.functionContext}
+\`\`\`
+
+### Filter Applied:
+\`\`\`php
+${filter.applyFiltersCall}
+\`\`\`
+---
+`;
+    }).join('\n');
+
+    const blob = new Blob([markdownContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'custom-wp-filters.md';
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowDownloadSelector(false);
+  };
+
+  const downloadAsJson = () => {
+    const blob = new Blob([JSON.stringify(filteredFilters, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'custom-wp-filters.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowDownloadSelector(false);
+  };
+
   return (
 
     <div id="app" className="App">
@@ -288,20 +341,26 @@ function App() {
               Showing {filteredFilters.length} of {filters.length} filters
             </div>
             <div className="download-json">
-              <button
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify(filteredFilters, null, 2)], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = 'custom-wp-filters.json';
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-                className="download-button"
-              >
-                Download as JSON
-              </button>
+              <div className="download-selector-container" ref={downloadSelectorRef}>
+                <button
+                  onClick={() => setShowDownloadSelector(!showDownloadSelector)}
+                  className="download-button"
+                >
+                  Download <svg className="chevron-icon" viewBox="0 0 24 24" width="16" height="16">
+                    <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" fill="currentColor"/>
+                  </svg>
+                </button>
+                {showDownloadSelector && (
+                  <div className="download-selector">
+                    <button onClick={downloadAsJson} className="download-option">
+                      Filters as JSON
+                    </button>
+                    <button onClick={downloadAsMarkdown} className="download-option">
+                      Filters as Markdown
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

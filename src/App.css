@@ -122,6 +122,9 @@ html {
   border-radius: 100px;
   white-space: nowrap;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .show-more-button {
@@ -466,4 +469,55 @@ html {
   font-size: 0.8rem;
   color: #666;
   margin-top: 0.5rem;
+}
+
+.download-selector-container {
+  position: relative;
+  display: inline-block;
+}
+
+.download-selector {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  min-width: 200px;
+  margin-top: 4px;
+}
+
+.download-option {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #333;
+}
+
+.download-option:hover {
+  background-color: #f5f5f5;
+}
+
+.download-option:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.download-option:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.chevron-icon {
+  transition: transform 0.3s ease;
+}
+
+.download-selector-container:hover .chevron-icon {
+  transform: translateY(2px);
 }
